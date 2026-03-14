@@ -1,0 +1,46 @@
+title: "The Cheshire Cat"
+description: >-
+  Virtual assistant for Siemens Tech Days.
+
+# language-model
+text:
+  api_key: "SIEMENS_API_KEY"
+  base_url: "https://api.siemens.com/llm/v1"
+  chat_model: "qwen3-30b-a3b-instruct-2507" # "glm-4.7"
+  embedding_model: "qwen3-embedding-0.6b"
+
+# speech-to-text
+stt:
+  api_key: "SIEMENS_API_KEY"
+  base_url: "https://api.siemens.com/llm/v1"
+  model: "whisper-large-v3-turbo"
+
+# text-to-speech
+audio:
+  api_key: "ELEVENLABS_API_KEY"
+  tts:
+    model_id: "eleven_v3" # "eleven_multilingual_v2"
+    output_format: "mp3_22050_32" #  # needs to be compatible with video generation
+    threads: 5
+    # todo: add 1 more czech and 2 english speakers, preferably with different genders
+    speakers:
+      - name: "Katarína"
+        id: "MpbYQvoTmXjHkaxtLiSh"
+        language: "cs" # iso language code
+        gender: "female" # important for czech language
+      - name: "Katarína"
+        id: "KXxZd16DiBqt82nbarJx"
+        language: "de"
+        gender: "female"
+      - name: "Katarína"
+        id: "cYctNG9CmLHHErrIh5s7"
+        language: "en"
+        gender: "female"
+
+  # speech-to-text
+  stt:
+    model_id: "scribe_v2"
+
+# decart lipsyncing
+video:
+  api_key: "DECART_API_KEY"
