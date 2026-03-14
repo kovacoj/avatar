@@ -1,0 +1,16 @@
+[project]
+name = "phonagnosia"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dotenv>=0.9.9",
+    "elevenlabs>=2.39.0",
+    "fastapi>=0.135.1",
+    "json-repair>=0.58.5",
+    "openai>=2.28.0",
+    "pyyaml>=6.0.3",
+    "streamlit>=1.55.0",
+    "uvicorn>=0.41.0",
+]
