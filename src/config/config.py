@@ -17,6 +17,8 @@ class Config:
 		load_dotenv(config_path / ".env")
 		settings["text"]["api_key"] = os.getenv("SIEMENS_API_KEY")
 		settings["stt"]["api_key"] = os.getenv("SIEMENS_API_KEY")
-		# TODO: set this up properly with the .env file and config.yaml
+		settings["embedding"]["api_key"] = os.getenv("SIEMENS_API_KEY")
+		settings["mcp"]["api_key"] = os.getenv("SIEMENS_API_KEY")
+		settings["tts"]["api_key"] = os.getenv("ELEVENLABS_API_KEY")
 
 		return settings
