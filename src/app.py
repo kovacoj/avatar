@@ -2,22 +2,11 @@ import streamlit as st
 import io
 import re
 
-from src.services.stt import Client as STTClient
-from src.services.llm import Client as LLMClient
-from src.services.tts import Client as TTSClient
-from src.config import config
+from src.services import text_to_speech, speech_to_text, text
 
 st.set_page_config(page_title="Phonagnosia", layout="centered")
 
-# ── Initialise clients (cached so they survive reruns) ──────────────
-@st.cache_resource
-def load_clients():
-    stt = STTClient(config.get("stt"))
-    llm = LLMClient(config.get("text"))
-    tts = TTSClient(config.get("audio"))
-    return stt, llm, tts
-
-stt_client, llm_client, tts_client = load_clients()
+stt_client, llm_client, tts_client = speech_to_text, text, text_to_speech
 
 # ── Session state ───────────────────────────────────────────────────
 if "messages" not in st.session_state:
@@ -65,7 +54,7 @@ if user_prompt_text:
     with st.spinner("Generating speech…"):
         split_pattern = re.compile(r'(?<=[.?!,;:\n])\s+')
         sentences = [s.strip() for s in split_pattern.split(full_response) if s.strip()]
-        print(language)
+
         audio_buffer = io.BytesIO()
         for phrase_stream in tts_client(iter(sentences), language=language):
             for chunk in phrase_stream:
