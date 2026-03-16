@@ -13,3 +13,4 @@ uv run python -m streamlit run src/app.py # start the streamlit app
 - [ ] Add custom MCP server to generate audio only when the user requests it
 - [ ] STT is from code.siemens and it isn't capable of language detection, another choice is elevenlabs
 - [ ] current STT also doesn't support streaming
+- [ ] connect to Siemens' MCP server. ([link](https://developer.internal.siemens.com/mcps/index.html))
