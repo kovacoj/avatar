@@ -21,16 +21,16 @@ class Client:
 
     def __call__(self, prompt):
         language = self.client.responses.parse(
-            model=self.config.get('chat_model'),
+            model=self.config.get('model'),
             input=[
                 {"role": "system", "content": "Infer what the language of the output should be based on the user's prompt. Respond ONLY with a JSON in the format {language: <language_code>} where <language_code> is a 2-letter ISO code (e.g. 'en' for English, 'cs' for Czech, 'de' for German). Do not include any other text. You can choose only those three. If you cannot infer the language, default to English."},
                 {"role": "user", "content": prompt},
             ],
             text_format=ISOLanguageCode
-        ).output[0].content[0].parsed.language
+        ).output_parsed.model_dump().get('language', 'en')
 
         response = self.client.chat.completions.create(
-            model=self.config.get("chat_model"),
+            model=self.config.get("model"),
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt.format(message=prompt)},
@@ -76,6 +76,6 @@ if __name__ == "__main__":
     client = Client(config["text"])
 
     response, language = client("Introduce yourself in 2 sentences. Answer in german.")
-    
+    print(language)
     for chunk in response:
         print(chunk)
