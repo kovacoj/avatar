@@ -1,12 +1,16 @@
 import streamlit as st
 import io
 import re
-
+import asyncio
 from src.services import text_to_speech, speech_to_text, text
 
+# Initialize the page
 st.set_page_config(page_title="Phonagnosia", layout="centered")
 
-stt_client, llm_client, tts_client = speech_to_text, text, text_to_speech
+# Map your service instances
+stt_client = speech_to_text
+llm_client = text  # This is the instance of your Client class
+tts_client = text_to_speech
 
 # ── Session state ───────────────────────────────────────────────────
 if "messages" not in st.session_state:
@@ -23,51 +27,76 @@ with chat_container:
         if msg.get("audio"):
             st.audio(msg["audio"], format="audio/mpeg", autoplay=False)
 
-# ── Chat text input ─────────────────────────────────────────────────
+# ── User Inputs ─────────────────────────────────────────────────────
 user_prompt_text = st.chat_input("Send a message…")
 
-# ── Audio input ─────────────────────────────────────────────────────
 audio_value = st.audio_input(
     "Or record a voice message",
     key=f"audio_{st.session_state.audio_key}",
 )
 
+# Handle Voice Input
 if not user_prompt_text and audio_value:
     with st.spinner("Transcribing…"):
-        user_prompt_text = stt_client(audio_value)
+        # Detect if stt_client is async or sync
+        if asyncio.iscoroutinefunction(stt_client):
+            user_prompt_text = asyncio.run(stt_client(audio_value))
+        else:
+            user_prompt_text = stt_client(audio_value)
     st.session_state.audio_key += 1
 
-# ── Process prompt ──────────────────────────────────────────────────
+# ── Main Processing Logic ──────────────────────────────────────────
 if user_prompt_text:
+    # Save and display user message
     st.session_state.messages.append({"role": "user", "content": user_prompt_text})
-
     with chat_container:
         with st.chat_message("user"):
             st.markdown(user_prompt_text)
 
-        # ── Stream LLM response ────────────────────────────────────
+    # ── Assistant Response ──
+    with chat_container:
         with st.chat_message("assistant"):
-            stream, language = llm_client(user_prompt_text)
-            full_response = st.write_stream(stream)
+            # We use a dict to store the language to avoid 'nonlocal' SyntaxErrors
+            runtime_data = {"lang": "en"}
 
-    # ── Generate TTS audio ─────────────────────────────────────────
+            async def text_stream_wrapper():
+                """
+                Consumes the (text, lang) tuple from llm_client 
+                and yields only text for st.write_stream.
+                """
+                async for chunk, lang in llm_client(user_prompt_text):
+                    runtime_data["lang"] = lang
+                    yield chunk
+
+            # Streamlit 1.40+ natively handles async generators
+            full_response = st.write_stream(text_stream_wrapper())
+
+    # ── TTS Generation ──
     with st.spinner("Generating speech…"):
+        # Split text into clean sentences
         split_pattern = re.compile(r'(?<=[.?!,;:\n])\s+')
         sentences = [s.strip() for s in split_pattern.split(full_response) if s.strip()]
-
+        
         audio_buffer = io.BytesIO()
-        for phrase_stream in tts_client(iter(sentences), language=language):
-            for chunk in phrase_stream:
-                if isinstance(chunk, (bytes, bytearray)) and chunk:
-                    audio_buffer.write(chunk)
+        detected_lang = runtime_data["lang"]
 
-        audio_bytes = audio_buffer.getvalue()
+        try:
+            # Generate audio for the sentences
+            # Note: keeping this sync as per your previous implementation
+            for phrase_stream in tts_client(iter(sentences), language=detected_lang):
+                for chunk in phrase_stream:
+                    if isinstance(chunk, (bytes, bytearray)) and chunk:
+                        audio_buffer.write(chunk)
+            
+            audio_bytes = audio_buffer.getvalue()
+        except Exception as e:
+            st.error(f"TTS Error: {e}")
+            audio_bytes = None
 
-    # ── Play audio ─────────────────────────────────────────────────
+    # ── Play and Save ──
     if audio_bytes:
         st.audio(audio_bytes, format="audio/mpeg", autoplay=True)
 
-    # ── Store assistant message ─────────────────────────────────────
     st.session_state.messages.append({
         "role": "assistant",
         "content": full_response,
