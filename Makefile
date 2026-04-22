@@ -1,5 +1,5 @@
 
-.PHONY: run-mcp run-app start test test-stt
+.PHONY: run-mcp run-app start test test-stt docker-build docker-run
 
 run-mcp:
 	uv run --with mcp src/server.py
@@ -15,3 +15,9 @@ test:
 
 test-stt:
 	bash test.sh
+
+docker-build:
+	docker build -t phonagnosia:local .
+
+docker-run:
+	docker run --rm -it -p 8501:8501 --env-file config/.env phonagnosia:local
