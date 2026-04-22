@@ -38,11 +38,14 @@ audio_value = st.audio_input(
 # Handle Voice Input
 if not user_prompt_text and audio_value:
     with st.spinner("Transcribing…"):
-        # Detect if stt_client is async or sync
-        if asyncio.iscoroutinefunction(stt_client):
-            user_prompt_text = asyncio.run(stt_client(audio_value))
-        else:
-            user_prompt_text = stt_client(audio_value)
+        try:
+            if asyncio.iscoroutinefunction(stt_client):
+                user_prompt_text = asyncio.run(stt_client(audio_value))
+            else:
+                user_prompt_text = stt_client(audio_value)
+        except Exception as e:
+            st.error(f"Transcription error: {e}")
+            user_prompt_text = None
     st.session_state.audio_key += 1
 
 # ── Main Processing Logic ──────────────────────────────────────────
@@ -72,26 +75,24 @@ if user_prompt_text:
             full_response = st.write_stream(text_stream_wrapper())
 
     # ── TTS Generation ──
-    with st.spinner("Generating speech…"):
-        # Split text into clean sentences
-        split_pattern = re.compile(r'(?<=[.?!,;:\n])\s+')
-        sentences = [s.strip() for s in split_pattern.split(full_response) if s.strip()]
-        
-        audio_buffer = io.BytesIO()
-        detected_lang = runtime_data["lang"]
+    audio_bytes = None
+    if full_response:
+        with st.spinner("Generating speech…"):
+            split_pattern = re.compile(r'(?<=[.?!,;:\n])\s+')
+            sentences = [s.strip() for s in split_pattern.split(full_response) if s.strip()]
 
-        try:
-            # Generate audio for the sentences
-            # Note: keeping this sync as per your previous implementation
-            for phrase_stream in tts_client(iter(sentences), language=detected_lang):
-                for chunk in phrase_stream:
-                    if isinstance(chunk, (bytes, bytearray)) and chunk:
-                        audio_buffer.write(chunk)
-            
-            audio_bytes = audio_buffer.getvalue()
-        except Exception as e:
-            st.error(f"TTS Error: {e}")
-            audio_bytes = None
+            audio_buffer = io.BytesIO()
+            detected_lang = runtime_data["lang"]
+
+            try:
+                for phrase_stream in tts_client(iter(sentences), language=detected_lang):
+                    for chunk in phrase_stream:
+                        if isinstance(chunk, (bytes, bytearray)) and chunk:
+                            audio_buffer.write(chunk)
+
+                audio_bytes = audio_buffer.getvalue()
+            except Exception as e:
+                st.error(f"TTS Error: {e}")
 
     # ── Play and Save ──
     if audio_bytes:
