@@ -60,12 +60,25 @@ make run-app   # start Streamlit app only
 make start     # start both for local development
 make test      # run unit tests
 make test-stt  # post sample wav file to Siemens STT endpoint
+make docker-build
+make docker-run
 ```
 
 ## Automation
 
 - GitHub Actions CI runs unit tests and Python compile checks on pull requests and pushes to `main`.
 - GitHub Actions CD runs on `main` and publishes verified source bundle as build artifact.
+- GitHub Actions image workflow builds and publishes `ghcr.io/<owner>/<repo>` container image on merges to `main`.
+
+## Container run
+
+```bash
+cp config/.env.example config/.env
+make docker-build
+make docker-run
+```
+
+Container starts local MCP server and Streamlit app in one process group. App becomes available on `http://localhost:8501`.
 
 ## Project structure
 
