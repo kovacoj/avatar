@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import json
 import logging
 import re
+import time
 from typing import AsyncGenerator, Literal
 
 from pydantic import BaseModel
@@ -37,7 +38,9 @@ class Client:
         )
         self.mcp_url = self.config.mcp_url or "http://localhost:8000/mcp"
 
-    async def __call__(self, prompt: str) -> AsyncGenerator[tuple[str, str], None]:
+    async def __call__(self, prompt: str, request_id: str | None = None) -> AsyncGenerator[tuple[str, str], None]:
+        logger.info("llm.request.start request_id=%s prompt_chars=%s", request_id, len(prompt))
+        started_at = time.perf_counter()
         language = await self._detect_language(prompt)
 
         messages = [
@@ -48,14 +51,26 @@ class Client:
         try:
             async with MCPClient(self.mcp_url) as mcp:
                 tools = await self._get_tools(mcp)
-                async for sentence in self.clean_stream(self._stream_with_tools(messages, tools, mcp)):
+                async for sentence in self.clean_stream(self._stream_with_tools(messages, tools, mcp, request_id=request_id)):
                     yield sentence, language
+                logger.info(
+                    "llm.request.done request_id=%s language=%s duration_ms=%s mcp=true",
+                    request_id,
+                    language,
+                    int((time.perf_counter() - started_at) * 1000),
+                )
                 return
         except Exception as exc:
-            logger.warning("MCP unavailable at %s: %s", self.mcp_url, exc)
+            logger.warning("mcp.connect.unavailable request_id=%s url=%s error=%s", request_id, self.mcp_url, exc)
 
-        async for sentence in self.clean_stream(self._stream_with_tools(messages, [], None)):
+        async for sentence in self.clean_stream(self._stream_with_tools(messages, [], None, request_id=request_id)):
             yield sentence, language
+        logger.info(
+            "llm.request.done request_id=%s language=%s duration_ms=%s mcp=false",
+            request_id,
+            language,
+            int((time.perf_counter() - started_at) * 1000),
+        )
 
     async def _get_tools(self, mcp) -> list[dict]:
         mcp_tools = await mcp.list_tools()
@@ -83,7 +98,7 @@ class Client:
             logger.warning("Language detection failed: %s", exc)
             return "en"
 
-    async def _stream_with_tools(self, messages: list[dict], tools: list[dict], mcp) -> AsyncGenerator[str, None]:
+    async def _stream_with_tools(self, messages: list[dict], tools: list[dict], mcp, request_id: str | None = None) -> AsyncGenerator[str, None]:
         while True:
             response_stream = await self.client.chat.completions.create(
                 model=self.config.model,
@@ -127,13 +142,15 @@ class Client:
             })
 
             if mcp is None:
-                logger.warning("Model requested tool call, but MCP client unavailable")
+                logger.warning("mcp.call.skipped request_id=%s reason=client_unavailable", request_id)
                 break
 
             for tc in complete_tool_calls:
                 try:
                     args = self._parse_tool_arguments(tc.arguments)
+                    logger.info("mcp.call.start request_id=%s tool=%s", request_id, tc.name)
                     result = await mcp.call_tool(tc.name, args)
+                    logger.info("mcp.call.done request_id=%s tool=%s", request_id, tc.name)
 
                     messages.append({
                         "role": "tool",
@@ -141,6 +158,7 @@ class Client:
                         "content": str(result),
                     })
                 except Exception as exc:
+                    logger.warning("mcp.call.error request_id=%s tool=%s error=%s", request_id, tc.name, exc)
                     messages.append({
                         "role": "tool",
                         "tool_call_id": tc.id,
@@ -217,7 +235,7 @@ async def main():
     ai_client = Client(config.text)
     prompt = "Use available tools if helpful. What is sin(0.5)?"
 
-    async for sentence, lang in ai_client(prompt):
+    async for sentence, lang in ai_client(prompt, request_id="manual"):
         print(f"[{lang}] {sentence}")
 
 if __name__ == "__main__":

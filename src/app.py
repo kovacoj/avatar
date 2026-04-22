@@ -1,8 +1,10 @@
 import streamlit as st
 
+from src.logging_utils import configure_logging, new_request_id
 from src.orchestration import get_chat_controller
 
 # Initialize the page
+configure_logging()
 st.set_page_config(page_title="Phonagnosia", layout="centered")
 
 chat = get_chat_controller()
@@ -32,9 +34,10 @@ audio_value = st.audio_input(
 
 # Handle Voice Input
 if not user_prompt_text and audio_value:
+    request_id = new_request_id()
     with st.spinner("Transcribing…"):
         try:
-            user_prompt_text = chat.transcribe_audio(audio_value)
+            user_prompt_text = chat.transcribe_audio(audio_value, request_id=request_id)
         except Exception as e:
             st.error(f"Transcription error: {e}")
             user_prompt_text = None
@@ -42,6 +45,7 @@ if not user_prompt_text and audio_value:
 
 # ── Main Processing Logic ──────────────────────────────────────────
 if user_prompt_text:
+    request_id = new_request_id()
     # Save and display user message
     st.session_state.messages.append({"role": "user", "content": user_prompt_text})
     with chat_container:
@@ -59,7 +63,7 @@ if user_prompt_text:
                 Consumes streamed backend response
                 and yields only text for st.write_stream.
                 """
-                async for chunk, lang in chat.stream_response(user_prompt_text):
+                async for chunk, lang in chat.stream_response(user_prompt_text, request_id=request_id):
                     runtime_data["lang"] = lang
                     yield chunk
 
@@ -71,7 +75,7 @@ if user_prompt_text:
     if full_response:
         with st.spinner("Generating speech…"):
             try:
-                audio_bytes = chat.synthesize_speech(full_response, runtime_data["lang"])
+                audio_bytes = chat.synthesize_speech(full_response, runtime_data["lang"], request_id=request_id)
             except Exception as e:
                 st.error(f"TTS Error: {e}")
 
