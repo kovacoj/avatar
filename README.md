@@ -58,8 +58,14 @@ MCP_BASE_URL=http://localhost:8000/mcp
 make run-mcp   # start local MCP server only
 make run-app   # start Streamlit app only
 make start     # start both for local development
+make test      # run unit tests
 make test-stt  # post sample wav file to Siemens STT endpoint
 ```
+
+## Automation
+
+- GitHub Actions CI runs unit tests and Python compile checks on pull requests and pushes to `main`.
+- GitHub Actions CD runs on `main` and publishes verified source bundle as build artifact.
 
 ## Project structure
 
