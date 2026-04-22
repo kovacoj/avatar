@@ -1,5 +1,6 @@
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
+import logging
 import queue
 import threading
 from typing import Generator
@@ -7,9 +8,11 @@ from typing import Generator
 from elevenlabs.client import ElevenLabs
 
 from src.config.models import TTSConfig
+from src.logging_utils import log_timing
 
 
 _SENTINEL = object()
+logger = logging.getLogger(__name__)
 
 
 class Client:
@@ -32,28 +35,29 @@ class Client:
             max_workers=self.config.threads
         )
 
-    def _worker(self, curr_text: str, prev_text: str, next_text: str, chunk_queue: queue.Queue, language: str):
+    def _worker(self, curr_text: str, prev_text: str, next_text: str, chunk_queue: queue.Queue, language: str, request_id: str | None):
         try:
-            audio_stream = self.client.text_to_speech.stream(
-                text=curr_text,
-                previous_text=prev_text or None,
-                next_text=next_text or None,
-                voice_id=self.speaker_id[language],
-                model_id=self.config.model_id,
-                language_code=language,
-                output_format=self.output_format,
-            )
+            with log_timing(logger, "tts.chunk_stream", request_id=request_id, language=language):
+                audio_stream = self.client.text_to_speech.stream(
+                    text=curr_text,
+                    previous_text=prev_text or None,
+                    next_text=next_text or None,
+                    voice_id=self.speaker_id[language],
+                    model_id=self.config.model_id,
+                    language_code=language,
+                    output_format=self.output_format,
+                )
 
-            for chunk in audio_stream:
-                if isinstance(chunk, (bytes, bytearray)) and chunk:
-                    chunk_queue.put(chunk)
+                for chunk in audio_stream:
+                    if isinstance(chunk, (bytes, bytearray)) and chunk:
+                        chunk_queue.put(chunk)
         except Exception as exc:
             chunk_queue.put(exc)
         finally:
             chunk_queue.put(_SENTINEL)
 
     def __call__(
-        self, sentence_stream: Generator[str, None, None], language="en"
+        self, sentence_stream: Generator[str, None, None], language="en", request_id: str | None = None
     ) -> Generator[Generator[bytes, None, None], None, None]:
         ordered_queues = queue.Queue()
 
@@ -81,6 +85,7 @@ class Client:
                     next_text,
                     sentence_queue,
                     language,
+                    request_id,
                 )
                 ordered_queues.put(sentence_queue)
 

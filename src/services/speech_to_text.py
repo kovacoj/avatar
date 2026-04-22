@@ -1,6 +1,12 @@
+import logging
+
 from openai import OpenAI
 
 from src.config.models import STTConfig
+from src.logging_utils import log_timing
+
+
+logger = logging.getLogger(__name__)
 
 
 class Client:
@@ -15,14 +21,15 @@ class Client:
 
     def __call__(self, audio_file, language: str = "en") -> str:
         file_payload = self._prepare_audio_file(audio_file)
-        return self.client.audio.transcriptions.create(
-            model=self.config.model,
-            file=file_payload,
-            response_format="verbose_json",
-            prompt=None,
-            temperature=0.0,
-            language=language,
-        ).text
+        with log_timing(logger, "stt.client", language=language, model=self.config.model):
+            return self.client.audio.transcriptions.create(
+                model=self.config.model,
+                file=file_payload,
+                response_format="verbose_json",
+                prompt=None,
+                temperature=0.0,
+                language=language,
+            ).text
 
     @staticmethod
     def _prepare_audio_file(audio_file):
