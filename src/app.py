@@ -1,16 +1,11 @@
 import streamlit as st
-import io
-import re
-import asyncio
-from src.services import text_to_speech, speech_to_text, text
+
+from src.orchestration import get_chat_controller
 
 # Initialize the page
 st.set_page_config(page_title="Phonagnosia", layout="centered")
 
-# Map your service instances
-stt_client = speech_to_text
-llm_client = text  # This is the instance of your Client class
-tts_client = text_to_speech
+chat = get_chat_controller()
 
 # ── Session state ───────────────────────────────────────────────────
 if "messages" not in st.session_state:
@@ -39,10 +34,7 @@ audio_value = st.audio_input(
 if not user_prompt_text and audio_value:
     with st.spinner("Transcribing…"):
         try:
-            if asyncio.iscoroutinefunction(stt_client):
-                user_prompt_text = asyncio.run(stt_client(audio_value))
-            else:
-                user_prompt_text = stt_client(audio_value)
+            user_prompt_text = chat.transcribe_audio(audio_value)
         except Exception as e:
             st.error(f"Transcription error: {e}")
             user_prompt_text = None
@@ -64,10 +56,10 @@ if user_prompt_text:
 
             async def text_stream_wrapper():
                 """
-                Consumes the (text, lang) tuple from llm_client 
+                Consumes streamed backend response
                 and yields only text for st.write_stream.
                 """
-                async for chunk, lang in llm_client(user_prompt_text):
+                async for chunk, lang in chat.stream_response(user_prompt_text):
                     runtime_data["lang"] = lang
                     yield chunk
 
@@ -78,19 +70,8 @@ if user_prompt_text:
     audio_bytes = None
     if full_response:
         with st.spinner("Generating speech…"):
-            split_pattern = re.compile(r'(?<=[.?!,;:\n])\s+')
-            sentences = [s.strip() for s in split_pattern.split(full_response) if s.strip()]
-
-            audio_buffer = io.BytesIO()
-            detected_lang = runtime_data["lang"]
-
             try:
-                for phrase_stream in tts_client(iter(sentences), language=detected_lang):
-                    for chunk in phrase_stream:
-                        if isinstance(chunk, (bytes, bytearray)) and chunk:
-                            audio_buffer.write(chunk)
-
-                audio_bytes = audio_buffer.getvalue()
+                audio_bytes = chat.synthesize_speech(full_response, runtime_data["lang"])
             except Exception as e:
                 st.error(f"TTS Error: {e}")
 
