@@ -1,0 +1,50 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  delivery-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: Sync dependencies
+        run: uv sync --dev --frozen
+
+      - name: Run verification
+        run: |
+          uv run --group dev pytest
+          uv run python -m compileall src
+
+      - name: Build release bundle
+        run: |
+          mkdir -p dist
+          tar \
+            --exclude='.git' \
+            --exclude='.venv' \
+            --exclude='output' \
+            --exclude='config/.env' \
+            -czf "dist/phonagnosia-${GITHUB_SHA}.tar.gz" \
+            AGENTS.md Makefile README.md config src pyproject.toml test.sh uv.lock
+
+      - name: Upload release bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phonagnosia-${{ github.sha }}
+          path: dist/phonagnosia-${{ github.sha }}.tar.gz
+          retention-days: 14
