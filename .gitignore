@@ -1,4 +1,5 @@
 /output/**/*.mp3
 /output/**/*.wav
+config/.env
 
 __pycache__/

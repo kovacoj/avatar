@@ -1,7 +1,7 @@
 [project]
 name = "phonagnosia"
 version = "0.1.0"
-description = "Add your description here"
+description = "Voice-first multilingual assistant demo with Siemens LLM/STT, Streamlit, MCP, and ElevenLabs TTS"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

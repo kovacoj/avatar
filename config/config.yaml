@@ -13,7 +13,7 @@ embedding:
 
 mcp:
   api_key: "SIEMENS_API_KEY"
-  base_url: "https://mcp.siemens.com/mcp"
+  base_url: "http://localhost:8000/mcp"
 
 tts:
   api_key: "ELEVENLABS_API_KEY"
