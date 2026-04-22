@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from src.config.models import TextConfig
 from src.services.text import Client, PendingToolCall
 
@@ -32,3 +34,24 @@ def test_complete_tool_calls_skips_incomplete_entries():
 
     assert len(complete) == 1
     assert complete[0].name == "sin"
+
+
+def test_merge_tool_call_chunk_reassembles_partial_stream():
+    client = build_text_client()
+    tool_calls = {}
+
+    first_chunk = SimpleNamespace(
+        index=0,
+        id="tool-1",
+        function=SimpleNamespace(name="sin", arguments='{"x":'),
+    )
+    second_chunk = SimpleNamespace(
+        index=0,
+        id=None,
+        function=SimpleNamespace(name=None, arguments=" 0.5}"),
+    )
+
+    client._merge_tool_call_chunk(tool_calls, first_chunk)
+    client._merge_tool_call_chunk(tool_calls, second_chunk)
+
+    assert tool_calls[0] == PendingToolCall(id="tool-1", name="sin", arguments='{"x": 0.5}')
