@@ -1,5 +1,5 @@
 
-.PHONY: run-mcp run-app start test-stt
+.PHONY: run-mcp run-app start test test-stt
 
 run-mcp:
 	uv run --with mcp src/server.py
@@ -9,6 +9,9 @@ run-app:
 
 start:
 	@uv run --with mcp src/server.py & MCP_PID=$$!; trap 'kill $$MCP_PID' EXIT; uv run python -m streamlit run src/app.py
+
+test:
+	uv run --group dev pytest
 
 test-stt:
 	bash test.sh
