@@ -2,7 +2,7 @@
 
 - Use `uv`, not plain `pip`. Lockfile is `uv.lock`; `pyproject.toml` requires Python `>=3.13`.
 - Main local run path: `make start`. This backgrounds `uv run --with mcp src/server.py` and then starts Streamlit with `uv run python -m streamlit run src/app.py`.
-- App depends on local MCP server at `http://localhost:8000/mcp`. `src/services/text.py` hardcodes this URL; `config/config.yaml` `mcp.base_url` is not wired in.
+- App depends on MCP server reachable at `config.config.yaml` `mcp.base_url`, defaulting to local `http://localhost:8000/mcp`. `src/config/config.py` also allows `MCP_BASE_URL` override from `config/.env`.
 
 # Config
 
